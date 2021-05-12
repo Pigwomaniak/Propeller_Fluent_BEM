@@ -400,8 +400,8 @@ void BEM(cell_t c, Thread* t,int a)
 					w=sqrt(u*u+(vt*vt));							//calculate inflow velocity
 					pdyn=rho*w*w/2.0;							//calculate dynamic pressure
 					alpha=-rotDir[j]*(180.0*theta/pi-beta);					//calculate AoA in deg
-					N_one_own=5.156*exp(-(tsr[j]-5.03)*(tsr[j]-5.03)/2.119936)+8.844;
-					f1=prandtl(r,fabs(theta),N_one_own,Rmax[j]);				//calculate Prandtl correction
+					//N_one_own=5.156*exp(-(tsr[j]-5.03)*(tsr[j]-5.03)/2.119936)+8.844;
+					f1=prandtl(r,fabs(theta),N_one,Rmax[j]);				//calculate Prandtl correction
 //					f1=prandtl(r,fabs(theta),Nbl[j],Rmax[j]);				//calculate Prandtl correction
 					Re=w*chord*rho/(1.831 * 0.00001);					//compute Reynolds number
 
