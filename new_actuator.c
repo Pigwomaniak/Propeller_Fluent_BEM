@@ -125,6 +125,8 @@ DEFINE_ON_DEMAND(UDMnamesetter)
 	Set_User_Memory_Name(3,"LocalCd");
 	Set_User_Memory_Name(4,"Cp");
 	Set_User_Memory_Name(5,"Ct");
+	Set_User_Memory_Name(6,"NormalForce");
+	Set_User_Memory_Name(7,"InflowAngle");
 }
 
 /*reread omega and velref values*/
@@ -348,14 +350,8 @@ void BEM(cell_t c, Thread* t,int a)
 	source=0;								//sets source to 0
 
 	/*BET*/
-	for (j=0;j<Nrotors;j++)
+	for (j=0;j<ACTIVE_PROPS_NUMBER;j++)
 	{
-		
-		if (j >= ACTIVE_PROPS_NUMBER){
-			source = 0;
-			return;
-		}
-		
 		if(r<=Rmax[j] && r>=Rmin[j] && (z>=zmin[j]-dz*Rmax[j]) && (z<=zmin[j]+dz*Rmax[j]))
 		{
 			c_face_loop(c,t,i)					//loop over all faces
@@ -371,16 +367,18 @@ void BEM(cell_t c, Thread* t,int a)
 					MFR=F_FLUX(f,tf);							//calculate mass flow rate
 					phi=atan2(y,x);								//calculate the cell angular coordinate in XY polar
 					u=C_W(c,t);
+					/*
 					if(u<0)
 					{
 						u=0;
 					}
+					*/
 
 					/*calculate the tangential velocity vt*/
 					vx=C_U(c,t);								//calculate x flow velocity component
 					vy=C_V(c,t);								//calculate y flow velocity component
 					vr=vy*cos(phi)-vx*sin(phi);						//calculate tangential flow velocity
-					vt=vr-omega[j]*r;							//calculate total tangential velocity
+					vt=-vr+omega[j]*r;							//calculate total tangential velocity
 
 					/*define beta and chord*/
 					if(j<0.5)
@@ -396,13 +394,13 @@ void BEM(cell_t c, Thread* t,int a)
 					}
 
 					/*calculate velocity triangles etc.*/
-					theta=atan2(u,vt)-(1+rotDir[j])*pi/2;					//calculate inflow angle
+					theta=atan2(u,vt);					//calculate inflow angle
 					w=sqrt(u*u+(vt*vt));							//calculate inflow velocity
 					pdyn=rho*w*w/2.0;							//calculate dynamic pressure
-					alpha=-rotDir[j]*(180.0*theta/pi-beta);					//calculate AoA in deg
+					alpha=180.0*theta/pi+beta;					//calculate AoA in deg
 					//N_one_own=5.156*exp(-(tsr[j]-5.03)*(tsr[j]-5.03)/2.119936)+8.844;
 					f1=prandtl(r,fabs(theta),N_one,Rmax[j]);				//calculate Prandtl correction
-//					f1=prandtl(r,fabs(theta),Nbl[j],Rmax[j]);				//calculate Prandtl correction
+					//f1=prandtl(r,fabs(theta),Nbl[j],Rmax[j]);				//calculate Prandtl correction
 					Re=w*chord*rho/(1.831 * 0.00001);					//compute Reynolds number
 
 					/*determine Cl, Cd on the basis of profile type and Re*/
@@ -414,15 +412,15 @@ void BEM(cell_t c, Thread* t,int a)
 					ClCdinterpolator(j,Re);
 
 					/*determine forces, powers etc.*/
-					dforcen=f1*Nbl[j]*pdyn*(Cl*cos(theta)-Cd*fabs(sin(theta)))*chord*A[2]/(2.*pi*r);		//calculate normal (axial) aerodynamic force
-					dforcet=f1*Nbl[j]*pdyn*(Cl*fabs(sin(theta))+Cd*cos(theta))*chord*A[2]/(2.*pi*r); //*rotDir[j];	//calculate tangential (rotational) aerodynamic force
+					dforcen=f1*Nbl[j]*pdyn*(Cl*cos(theta)-Cd*sin(theta))*chord*A[2]/(2.*pi*r);		//calculate normal (axial) aerodynamic force
+					dforcet=f1*Nbl[j]*pdyn*(Cl*sin(theta)+Cd*cos(theta))*chord*A[2]/(2.*pi*r); //*rotDir[j];	//calculate tangential (rotational) aerodynamic force
 					dpower=dforcet*r*omega[j];
 					TKE=(3*(w*w*Cl*Cl)/8)*(Nbl[j]*chord/(2.*pi*r));							//calculate local TKE
 
 					/*determine source terms*/
 					if (z>=zmin[j])
 					{
-						if (a==0) source= dforcet*sin(phi)/V;								//calculate x component of actuator force from (tangential) aerodynamic force
+						if (a==0) source=dforcet*sin(phi)/V;								//calculate x component of actuator force from (tangential) aerodynamic force
 						if (a==1) source=-dforcet*cos(phi)/V;								//calculate y component of actuator force from (tangential) aerodynamic  force
 						if (a==2) source=dforcen/V;									//calculate z component of actuator force from (normal) aerodynamic force
 						if (a==3) source= MFR*TKE/V;									//https://www.sharcnet.ca/Software/Fluent6/html/ug/node217.htm
@@ -444,8 +442,19 @@ void BEM(cell_t c, Thread* t,int a)
 					C_UDMI(c,t,3)=Cd;
 					C_UDMI(c,t,4)=dpower/(rho*pi*Rmax[j]*Rmax[j]*velref*velref*velref/2);
 					C_UDMI(c,t,5)=dforcen/(rho*pi*Rmax[j]*Rmax[j]*velref*velref/2);
+					C_UDMI(c,t,6)=dforcen;
+					C_UDMI(c,t,7)=theta;
 				}
 			}
+		} else{
+			C_UDMI(c,t,0)=0;
+			C_UDMI(c,t,1)=0;
+			C_UDMI(c,t,2)=0;
+			C_UDMI(c,t,3)=0;
+			C_UDMI(c,t,4)=0;
+			C_UDMI(c,t,5)=0;
+			C_UDMI(c,t,6)=0;
+			C_UDMI(c,t,7)=0;
 		}
 	}
 }
